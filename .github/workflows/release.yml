@@ -37,6 +37,7 @@ jobs:
           mkdir -p ./data
           touch ./data/tts-service.sqlite
           mkdir -p ./release
+          go mod tidy
           go build -o ./release/${{ matrix.platform.name }} main.go
 
       - name: Upload binaries to release

@@ -18,6 +18,8 @@ generate_api_key() {
 echo "📁 创建目录结构..."
 mkdir -p storage
 mkdir -p logs
+mkdir -p data
+
 
 # 创建示例配置文件（如果不存在）
 if [ ! -f "config.yaml" ]; then

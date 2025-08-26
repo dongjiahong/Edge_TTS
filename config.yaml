@@ -1,0 +1,30 @@
+server:
+  port: 2828
+  host: "0.0.0.0"
+
+database:
+  path: "./tts.db"
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+storage:
+  path: "./storage"
+  max_size: "1GB"
+  cleanup_hours: 24  # 24小时后清理缓存文件
+
+tts:
+  engines:
+    - edge
+  default_voice: "zh-CN-XiaoxiaoNeural"
+  default_format: "mp3"
+  
+edge_tts:
+  endpoint: "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1"
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.66 Safari/537.36 Edg/103.0.1264.44"
+
+logging:
+  level: "info"
+  file: "./logs/tts.log"

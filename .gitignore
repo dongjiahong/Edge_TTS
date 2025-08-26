@@ -1,0 +1,104 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+tts-service
+user-manager
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Go workspace file
+go.work
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Log files
+logs/
+*.log
+
+# Audio storage
+storage/
+*.mp3
+*.wav
+*.ogg
+*.m4a
+*.flac
+
+# Configuration files (may contain sensitive data)
+config.yaml
+config.yml
+config.json
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# API Keys and secrets
+api_keys.txt
+secrets/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Runtime files
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# Documentation build output
+docs/_build/
+
+# Backup files
+*.bak
+*.backup
+
+# Cache directories
+.cache/
+node_modules/
+
+# Build artifacts
+build/
+dist/
+target/
+
+# Development usage documentation
+README_USAGE.md
+
+# Test outputs
+test_*.mp3
+test_*.wav

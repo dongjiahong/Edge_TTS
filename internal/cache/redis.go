@@ -83,7 +83,7 @@ func (r *RedisClient) SetJSON(key string, value interface{}, expiration time.Dur
 
 // GetJSON 获取JSON格式的缓存
 func (r *RedisClient) GetJSON(key string, dest interface{}) error {
-	val, err := r.client.Get(r.ctx, key).Result()
+	_, err := r.client.Get(r.ctx, key).Result()
 	if err != nil {
 		if err == redis.Nil {
 			return fmt.Errorf("缓存不存在")

@@ -3,7 +3,7 @@ server:
   host: "0.0.0.0"
 
 database:
-  path: "./tts.db"
+  path: "./data/tts.db"
 
 redis:
   addr: "localhost:6379"

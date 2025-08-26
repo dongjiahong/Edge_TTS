@@ -7,6 +7,10 @@
 tts-service
 user-manager
 
+go.sum
+tts.db-shm
+tts.db-wal
+
 # Test binary, built with `go test -c`
 *.test
 

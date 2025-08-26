@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "WebSearch"
+      "WebSearch",
+      "Read(//Users/lele/develop/tmp/read-aloud/src/lib/tts/**)"
     ],
     "deny": [],
     "ask": []

@@ -1,13 +1,12 @@
 package tts
 
 import (
-	"bytes"
+	"crypto/sha256"
 	"fmt"
-	"log"
-	"net/http"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"tts-service/internal/config"
 	"tts-service/internal/utils"
@@ -25,6 +24,32 @@ func NewEdgeTTSClient(cfg *config.EdgeTTSConfig) *EdgeTTSClient {
 	}
 }
 
+// generateURL 生成动态WebSocket URL
+func (c *EdgeTTSClient) generateURL() (string, error) {
+	connectionID := strings.ReplaceAll(uuid.New().String(), "-", "")
+	trustedClientToken := "6A5AA1D4EAFF4E9FB37E23D68491D6F4"
+	secMSGECVersion := "1-131.0.2903.99"
+
+	// 生成Sec-MS-GEC
+	winEpoch := int64(11644473600) // 从Windows纪元到Unix纪元的偏移量(秒)
+	currentTimestamp := time.Now().Unix()
+	adjustedSeconds := currentTimestamp + winEpoch
+	adjustedSeconds -= adjustedSeconds % 300 // 调整到最近5分钟边界
+
+	// 转换为Windows文件时间(100纳秒单位)
+	winFileTime := adjustedSeconds * 10000000
+
+	// 计算SHA-256
+	hashInput := fmt.Sprintf("%d%s", winFileTime, trustedClientToken)
+	hash := sha256.Sum256([]byte(hashInput))
+	secMSGEC := fmt.Sprintf("%X", hash)
+
+	url := fmt.Sprintf("wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=%s&Sec-MS-GEC=%s&Sec-MS-GEC-Version=%s&ConnectionId=%s",
+		trustedClientToken, secMSGEC, secMSGECVersion, connectionID)
+
+	return url, nil
+}
+
 // Synthesize 执行语音合成
 func (c *EdgeTTSClient) Synthesize(text, voice, format string, speed float64, pitch int) ([]byte, error) {
 	// 建立WebSocket连接
@@ -35,7 +60,7 @@ func (c *EdgeTTSClient) Synthesize(text, voice, format string, speed float64, pi
 	defer conn.Close()
 
 	// 生成请求ID
-	requestID := utils.GenerateRequestID()
+	requestID := strings.ReplaceAll(uuid.New().String(), "-", "")
 
 	// 发送配置消息
 	if err := c.sendConfig(conn, requestID, format); err != nil {
@@ -49,7 +74,7 @@ func (c *EdgeTTSClient) Synthesize(text, voice, format string, speed float64, pi
 	}
 
 	// 接收音频数据
-	audioData, err := c.receiveAudio(conn)
+	audioData, err := c.receiveAudio(conn, requestID)
 	if err != nil {
 		return nil, fmt.Errorf("接收音频数据失败: %w", err)
 	}
@@ -59,15 +84,16 @@ func (c *EdgeTTSClient) Synthesize(text, voice, format string, speed float64, pi
 
 // connect 建立WebSocket连接
 func (c *EdgeTTSClient) connect() (*websocket.Conn, error) {
-	headers := http.Header{}
-	headers.Set("User-Agent", c.config.UserAgent)
-	headers.Set("Origin", "chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold")
+	url, err := c.generateURL()
+	if err != nil {
+		return nil, fmt.Errorf("生成URL失败: %w", err)
+	}
 
 	dialer := websocket.Dialer{
 		HandshakeTimeout: 30 * time.Second,
 	}
 
-	conn, _, err := dialer.Dial(c.config.Endpoint, headers)
+	conn, _, err := dialer.Dial(url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -78,37 +104,48 @@ func (c *EdgeTTSClient) connect() (*websocket.Conn, error) {
 // sendConfig 发送音频配置
 func (c *EdgeTTSClient) sendConfig(conn *websocket.Conn, requestID, format string) error {
 	// 音频格式映射
-	audioFormat := c.mapAudioFormat(format)
-	
-	configMsg := fmt.Sprintf(`Path: speech.config
-Content-Type: application/json; charset=utf-8
-X-RequestId: %s
-X-Timestamp: %s
+	formatMap := map[string]string{
+		"mp3": "audio-24khz-48kbitrate-mono-mp3",
+		"wav": "riff-24khz-16bit-mono-pcm",
+		"ogg": "ogg-24khz-16bit-mono-opus",
+	}
 
-{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"true"},"outputFormat":"%s"}}}}`,
-		requestID,
-		c.getTimestamp(),
-		audioFormat,
-	)
+	audioFormat, exists := formatMap[format]
+	if !exists {
+		audioFormat = "audio-24khz-48kbitrate-mono-mp3" // 默认MP3
+	}
 
-	return conn.WriteMessage(websocket.TextMessage, []byte(configMsg))
+	configData := map[string]interface{}{
+		"context": map[string]interface{}{
+			"synthesis": map[string]interface{}{
+				"audio": map[string]interface{}{
+					"metadataoptions": map[string]interface{}{
+						"sentenceBoundaryEnabled": "false",
+						"wordBoundaryEnabled":     "false",
+					},
+					"outputFormat": audioFormat,
+				},
+			},
+		},
+	}
+
+	config := fmt.Sprintf("X-Timestamp:%s\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{\"context\":{\"synthesis\":{\"audio\":{\"metadataoptions\":{\"sentenceBoundaryEnabled\":\"false\",\"wordBoundaryEnabled\":\"false\"},\"outputFormat\":\"%s\"}}}}",
+		time.Now().Format("Mon Jan 02 2006 15:04:05 GMT-0700 (MST)"), audioFormat)
+
+	return conn.WriteMessage(websocket.TextMessage, []byte(config))
 }
 
 // sendSSML 发送SSML文本
 func (c *EdgeTTSClient) sendSSML(conn *websocket.Conn, requestID, ssml string) error {
-	ssmlMsg := fmt.Sprintf(`Path: ssml
-Content-Type: application/ssml+xml
-X-RequestId: %s
-X-Timestamp: %s
+	message := fmt.Sprintf("X-Timestamp:%s\r\nX-RequestId:%s\r\nContent-Type:application/ssml+xml\r\nPath:ssml\r\n\r\n%s",
+		time.Now().Format("Mon Jan 02 2006 15:04:05 GMT-0700 (MST)"), requestID, ssml)
 
-%s`, requestID, c.getTimestamp(), ssml)
-
-	return conn.WriteMessage(websocket.TextMessage, []byte(ssmlMsg))
+	return conn.WriteMessage(websocket.TextMessage, []byte(message))
 }
 
-// receiveAudio 接收音频数据
-func (c *EdgeTTSClient) receiveAudio(conn *websocket.Conn) ([]byte, error) {
-	var audioBuffer bytes.Buffer
+// receiveAudio 接收音频数据  
+func (c *EdgeTTSClient) receiveAudio(conn *websocket.Conn, requestID string) ([]byte, error) {
+	audioChunks := [][]byte{}
 	
 	// 设置读取超时
 	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
@@ -116,95 +153,63 @@ func (c *EdgeTTSClient) receiveAudio(conn *websocket.Conn) ([]byte, error) {
 	for {
 		messageType, message, err := conn.ReadMessage()
 		if err != nil {
-			if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-				break
-			}
 			return nil, err
 		}
 
 		switch messageType {
 		case websocket.TextMessage:
-			// 处理文本消息（可能包含边界信息等）
-			if c.isEndMessage(message) {
-				log.Printf("收到结束消息: %s", string(message))
-				goto done
+			messageStr := string(message)
+			if strings.Contains(messageStr, "Path:turn.start") {
+				// 开始接收音频
+				continue
+			} else if strings.Contains(messageStr, "Path:turn.end") {
+				// 音频接收完成
+				if len(audioChunks) == 0 {
+					return nil, fmt.Errorf("未收到音频数据")
+				}
+				return c.concatenateAudio(audioChunks), nil
 			}
+
 		case websocket.BinaryMessage:
-			// 处理二进制音频数据
-			if c.isAudioData(message) {
-				// 跳过头部，提取音频数据
-				audioData := c.extractAudioData(message)
+			// 提取音频数据 (跳过头部信息)
+			audioSeparator := []byte("Path:audio\r\n")
+			if idx := c.indexOf(message, audioSeparator); idx >= 0 {
+				audioData := message[idx+len(audioSeparator):]
 				if len(audioData) > 0 {
-					audioBuffer.Write(audioData)
+					audioChunks = append(audioChunks, audioData)
 				}
 			}
 		}
 	}
+}
 
-done:
-	if audioBuffer.Len() == 0 {
-		return nil, fmt.Errorf("没有收到音频数据")
+// concatenateAudio 合并音频数据
+func (c *EdgeTTSClient) concatenateAudio(chunks [][]byte) []byte {
+	totalLength := 0
+	for _, chunk := range chunks {
+		totalLength += len(chunk)
 	}
 
-	return audioBuffer.Bytes(), nil
-}
-
-// mapAudioFormat 映射音频格式
-func (c *EdgeTTSClient) mapAudioFormat(format string) string {
-	switch strings.ToLower(format) {
-	case "mp3":
-		return "audio-24khz-48kbitrate-mono-mp3"
-	case "wav":
-		return "riff-24khz-16bit-mono-pcm"
-	case "ogg":
-		return "ogg-24khz-16bit-mono-opus"
-	default:
-		return "audio-24khz-48kbitrate-mono-mp3"
+	result := make([]byte, totalLength)
+	offset := 0
+	for _, chunk := range chunks {
+		copy(result[offset:], chunk)
+		offset += len(chunk)
 	}
+
+	return result
 }
 
-// getTimestamp 获取时间戳
-func (c *EdgeTTSClient) getTimestamp() string {
-	return time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
-}
+// indexOf 查找字节序列位置
+func (c *EdgeTTSClient) indexOf(data, separator []byte) int {
+	if len(separator) == 0 {
+		return 0
+	}
 
-// isEndMessage 检查是否为结束消息
-func (c *EdgeTTSClient) isEndMessage(message []byte) bool {
-	return strings.Contains(string(message), "Path:turn.end")
-}
-
-// isAudioData 检查是否为音频数据
-func (c *EdgeTTSClient) isAudioData(message []byte) bool {
-	// 检查是否包含音频数据头部
-	return strings.Contains(string(message[:min(200, len(message))]), "Path:audio") ||
-		   bytes.Contains(message[:min(50, len(message))], []byte("Path:audio"))
-}
-
-// extractAudioData 提取音频数据
-func (c *EdgeTTSClient) extractAudioData(message []byte) []byte {
-	// 查找音频数据开始位置（通常在两个换行符之后）
-	headerEnd := bytes.Index(message, []byte("\r\n\r\n"))
-	if headerEnd == -1 {
-		headerEnd = bytes.Index(message, []byte("\n\n"))
-		if headerEnd == -1 {
-			return nil
+	for i := 0; i <= len(data)-len(separator); i++ {
+		if string(data[i:i+len(separator)]) == string(separator) {
+			return i
 		}
-		headerEnd += 2
-	} else {
-		headerEnd += 4
 	}
-	
-	if headerEnd >= len(message) {
-		return nil
-	}
-	
-	return message[headerEnd:]
-}
-
-// min 辅助函数
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
+	return -1
 }

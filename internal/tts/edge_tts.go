@@ -115,20 +115,6 @@ func (c *EdgeTTSClient) sendConfig(conn *websocket.Conn, requestID, format strin
 		audioFormat = "audio-24khz-48kbitrate-mono-mp3" // 默认MP3
 	}
 
-	configData := map[string]interface{}{
-		"context": map[string]interface{}{
-			"synthesis": map[string]interface{}{
-				"audio": map[string]interface{}{
-					"metadataoptions": map[string]interface{}{
-						"sentenceBoundaryEnabled": "false",
-						"wordBoundaryEnabled":     "false",
-					},
-					"outputFormat": audioFormat,
-				},
-			},
-		},
-	}
-
 	config := fmt.Sprintf("X-Timestamp:%s\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{\"context\":{\"synthesis\":{\"audio\":{\"metadataoptions\":{\"sentenceBoundaryEnabled\":\"false\",\"wordBoundaryEnabled\":\"false\"},\"outputFormat\":\"%s\"}}}}",
 		time.Now().Format("Mon Jan 02 2006 15:04:05 GMT-0700 (MST)"), audioFormat)
 

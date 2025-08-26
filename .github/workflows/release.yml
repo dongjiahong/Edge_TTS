@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    name: Release - ${{ matrix.platform.release_for }}
+    permissions: write-all
+    runs-on: ${{ matrix.platform.os }}
+    strategy:
+      matrix:
+        platform:
+          - release_for: Linux-x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            bin: tts-service
+            name: tts-service-linux-amd64
+            goos: linux
+            goarch: amd64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.platform.goos }}
+          GOARCH: ${{ matrix.platform.goarch }}
+        run: |
+          mkdir -p ./data
+          touch ./data/tts-service.sqlite
+          mkdir -p ./release
+          go build -o ./release/${{ matrix.platform.name }} main.go
+
+      - name: Upload binaries to release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: |
+            ./release/${{ matrix.platform.name }}
+          draft: false
+          prerelease: false

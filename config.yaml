@@ -12,8 +12,8 @@ redis:
 
 storage:
   path: "./storage"
-  max_size: "1GB"
-  cleanup_hours: 24  # 24小时后清理缓存文件
+  max_size: "3GB"
+  cleanup_hours: 100  # 24小时后清理缓存文件
 
 tts:
   engines:

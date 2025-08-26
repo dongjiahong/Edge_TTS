@@ -227,15 +227,6 @@ A: 可以调整 `storage.cleanup_hours` 配置，定期清理缓存文件。
 ### Q: 如何增加新的语音？
 A: 修改 `internal/server/handlers.go` 中的 `GetVoices` 方法，添加新的语音选项。
 
-## 📝 开发计划
-
-- [ ] 支持更多音频格式 (AAC, FLAC)
-- [ ] 添加音频后处理功能
-- [ ] 支持 SSML 高级标记
-- [ ] 添加 Web 管理界面
-- [ ] 支持多 TTS 引擎
-- [ ] 添加使用量统计
-
 ## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request！

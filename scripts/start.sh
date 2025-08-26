@@ -18,6 +18,7 @@ fi
 # 创建必要的目录
 mkdir -p storage
 mkdir -p logs
+mkdir -p data
 
 echo "📁 创建存储目录完成"
 

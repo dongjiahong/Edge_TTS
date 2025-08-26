@@ -2,7 +2,7 @@
 # API测试脚本
 
 API_BASE="http://localhost:2828/api/v1"
-API_KEY="f3fdf5ccb5bd04e191cd0b9a3d4072e98afa07fb984babe7ea1019c3479cd0da"
+API_KEY="b74a50d601132f6ebf83ae60da6aea2a87cae548762a82ea77470e5a4527aab9"
 
 # 颜色输出
 RED='\033[0;31m'

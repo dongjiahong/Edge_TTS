@@ -3,16 +3,7 @@
 # TTS服务初始化脚本
 echo "🎯 初始化 TTS 服务..."
 
-# 生成随机API Key
-generate_api_key() {
-    if command -v openssl &> /dev/null; then
-        openssl rand -hex 32
-    elif command -v uuidgen &> /dev/null; then
-        echo "tts_$(uuidgen | tr -d '-' | tr '[:upper:]' '[:lower:]')"
-    else
-        echo "tts_$(date +%s)_$(shuf -i 100000-999999 -n 1)"
-    fi
-}
+# 注意：不再使用generate_api_key函数，直接通过用户管理工具创建
 
 # 创建必要的目录
 echo "📁 创建目录结构..."
@@ -81,11 +72,28 @@ else
     exit 1
 fi
 
-# 生成初始API Key
-API_KEY=$(generate_api_key)
-echo ""
-echo "🔑 初始API Key (请保存): $API_KEY"
-echo ""
+# 编译用户管理工具
+echo "🔨 编译用户管理工具..."
+go build -o user-manager cmd/user-manager/main.go
+if [ $? -ne 0 ]; then
+    echo "❌ 用户管理工具编译失败"
+    exit 1
+fi
+
+# 创建初始用户
+echo "👤 创建初始用户..."
+INITIAL_USER_OUTPUT=$(./user-manager -action create -name "admin" 2>&1)
+if [ $? -eq 0 ]; then
+    API_KEY=$(echo "$INITIAL_USER_OUTPUT" | grep "API Key:" | awk '{print $3}')
+    echo "✅ 初始用户创建成功"
+    echo ""
+    echo "🔑 初始API Key (请保存): $API_KEY"
+    echo ""
+else
+    echo "❌ 初始用户创建失败"
+    echo "$INITIAL_USER_OUTPUT"
+    exit 1
+fi
 
 # 创建使用说明
 cat > README_USAGE.md << EOF
